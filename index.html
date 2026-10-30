@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Gestión Clínica - Dra. Edianny Salazar</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 900px; margin: 30px auto; padding: 20px; background: #f4f7f6; }
+        h1 { text-align: center; color: #333; margin-bottom: 25px; }
+        .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        input, select, textarea { display: block; width: 100%; padding: 10px; margin: 8px 0; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; }
+        textarea { resize: vertical; height: 60px; }
+        .row { display: flex; gap: 10px; }
+        .row > div { flex: 1; }
+        .checkbox-container { display: flex; align-items: center; gap: 10px; margin: 12px 0; font-weight: bold; color: #333; }
+        .checkbox-container input { width: 20px; height: 20px; margin: 0; cursor: pointer; }
+        
+        button { background: #007bff; color: white; border: none; padding: 10px 15px; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        button:hover { background: #0056b3; }
+        .btn-secundario { background: #6c757d; }
+        .btn-secundario:hover { background: #5a6268; }
+        .btn-exito { background: #28a745; width: 100%; padding: 12px; font-size: 16px; margin-bottom: 15px; }
+        .btn-exito:hover { background: #218838; }
+
+        /* Barra de búsqueda superior */
+        .buscador-container { display: flex; gap: 10px; margin-bottom: 15px; }
+        .buscador-container input { margin: 0; }
+
+        ul { padding-left: 0; list-style: none; max-height: 500px; overflow-y: auto; }
+        li { background: #fff; border: 1px solid #e1e8ed; padding: 15px; border-radius: 6px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+        li:hover { background: #f8fafc; }
+
+        .alerta-roja { color: #d9534f; font-weight: bold; }
+        .estado-verde { color: #28a745; font-weight: bold; }
+        .oculto { display: none; }
+        .ficha-header { background: #e9ecef; padding: 15px; border-radius: 6px; margin-bottom: 15px; }
+        .emergencia-box { background: #fff3cd; border: 1px solid #ffeeba; padding: 10px; border-radius: 5px; margin: 10px 0; }
+    </style>
+</head>
+<body>
+
+    <h1>Gestión Clínica Dental - Dra. Edianny Salazar</h1>
+
+    <!-- VISTA PRINCIPAL: BUSCADOR Y LISTA DE PACIENTES -->
+    <div id="vista-principal" class="card">
+        
+        <!-- Botón para abrir el formulario de alta -->
+        <button class="btn-exito" onclick="mostrarFormularioRegistro()">+ Registrar Nuevo Paciente</button>
+
+        <!-- Buscador rápido -->
+        <div class="buscador-container">
+            <input type="text" id="buscador" placeholder="🔍 Buscar paciente por nombre..." oninput="filtrarPacientes()">
+        </div>
+
+        <h2>Lista de Pacientes</h2>
+        <ul id="lista-pacientes"></ul>
+    </div>
+
+    <!-- VISTA FORMULARIO DE REGISTRO (Oculta por defecto) -->
+    <div id="vista-registro" class="card oculto">
+        <button class="btn-secundario" onclick="volverAlPrincipal()">← Volver al Listado</button>
+        <h2 style="margin-top: 15px;">Registrar Nuevo Paciente</h2>
+        
+        <input type="text" id="nombre" placeholder="Nombre y Apellidos *" oninput="soloLetras(this)">
+        
+        <div class="row">
+            <div>
+                <select id="tipo_doc">
+                    <option value="DNI">DNI</option>
+                    <option value="NIE">NIE</option>
+                    <option value="Pasaporte">Pasaporte</option>
+                </select>
+            </div>
+            <div>
+                <input type="text" id="num_doc" placeholder="Número de documento">
+            </div>
+        </div>
+
+        <div class="row">
+            <div>
+                <input type="text" id="telefono" placeholder="Teléfono *" oninput="soloNumeros(this)">
+            </div>
+            <div>
+                <input type="email" id="email" placeholder="Correo electrónico">
+            </div>
+        </div>
+
+        <input type="text" id="direccion" placeholder="Dirección (Calle, número, piso, CP, ciudad)">
+
+        <div class="row">
+            <div>
+                <input type="text" id="contacto_emergencia" placeholder="Contacto de emergencia (Nombre/Parentesco)">
+            </div>
+            <div>
+                <input type="text" id="tel_emergencia" placeholder="Tel. de emergencia" oninput="soloNumeros(this)">
+            </div>
+        </div>
+
+        <textarea id="alergias" placeholder="Alergias (ej. Penicilina, Látex...)"></textarea>
+        <textarea id="antecedentes" placeholder="Antecedentes médicos relevantes"></textarea>
+
+        <div class="checkbox-container">
+            <input type="checkbox" id="lopd">
+            <label for="lopd">Consentimiento LOPD / RGPD firmado</label>
+        </div>
+
+        <button onclick="guardarPaciente()" style="width: 100%; padding: 12px; margin-top: 10px;">Guardar y Crear Ficha</button>
+    </div>
+
+    <!-- VISTA FICHA INDIVIDUAL E HISTORIAL (Oculta por defecto) -->
+    <div id="vista-ficha" class="card oculto">
+        <button class="btn-secundario" onclick="volverAlPrincipal()">← Volver al Listado</button>
+        <div id="contenido-ficha"></div>
+
+        <div class="card" style="margin-top: 20px; background: #f8f9fa;">
+            <h3>Añadir Nueva Visita / Tratamiento</h3>
+            <input type="text" id="visita-fecha" placeholder="Fecha (ej. 30/10/2026)">
+            <textarea id="visita-tratamiento" placeholder="Descripción del tratamiento o nota clínica..."></textarea>
+            <input type="text" id="visita-coste" placeholder="Coste / Presupuesto (ej. 60€)">
+            <button onclick="guardarVisita()">Registrar Visita en Historial</button>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = 'http://127.0.0.1:5000/pacientes';
+        let pacientesCache = [];
+        let pacienteActualId = null;
+
+        function soloLetras(input) {
+            input.value = input.value.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/g, '');
+        }
+
+        function soloNumeros(input) {
+            input.value = input.value.replace(/[^0-9]/g, '');
+        }
+
+        async function cargarPacientes() {
+            const respuesta = await fetch(API_URL);
+            pacientesCache = await respuesta.json();
+            mostrarLista(pacientesCache);
+        }
+
+        function mostrarLista(pacientes) {
+            const lista = document.getElementById('lista-pacientes');
+            lista.innerHTML = '';
+            
+            if (pacientes.length === 0) {
+                lista.innerHTML = '<p style="color: #666; text-align: center; padding: 20px;">No se encontraron pacientes.</p>';
+                return;
+            }
+
+            pacientes.forEach(p => {
+                const li = document.createElement('li');
+                li.innerHTML = `
+                    <div>
+                        <strong style="font-size: 16px; color: #007bff;">${p.nombre}</strong><br>
+                        <span style="font-size: 13px; color: #555;">📞 ${p.telefono} | LOPD: ${p.lopd ? '✅ Firmado' : '❌ Pendiente'}</span>
+                    </div>
+                    <button onclick="abrirFicha(${p.id})" style="padding: 8px 16px;">Abrir Ficha</button>
+                `;
+                lista.appendChild(li);
+            });
+        }
+
+        function filtrarPacientes() {
+            const texto = document.getElementById('buscador').value.toLowerCase();
+            const filtrados = pacientesCache.filter(p => p.nombre.toLowerCase().includes(texto));
+            mostrarLista(filtrados);
+        }
+
+        function mostrarFormularioRegistro() {
+            document.getElementById('vista-principal').classList.add('oculto');
+            document.getElementById('vista-registro').classList.remove('oculto');
+        }
+
+        function volverAlPrincipal() {
+            document.getElementById('vista-registro').classList.add('oculto');
+            document.getElementById('vista-ficha').classList.add('oculto');
+            document.getElementById('vista-principal').classList.remove('oculto');
+            document.getElementById('buscador').value = '';
+            cargarPacientes();
+        }
+
+        async function guardarPaciente() {
+            const nombre = document.getElementById('nombre').value;
+            const telefono = document.getElementById('telefono').value;
+
+            if (!nombre || !telefono) {
+                alert('El nombre y el teléfono son obligatorios.');
+                return;
+            }
+
+            const datos = {
+                nombre: nombre,
+                tipo_doc: document.getElementById('tipo_doc').value,
+                num_doc: document.getElementById('num_doc').value,
+                telefono: telefono,
+                email: document.getElementById('email').value,
+                direccion: document.getElementById('direccion').value,
+                contacto_emergencia: document.getElementById('contacto_emergencia').value,
+                tel_emergencia: document.getElementById('tel_emergencia').value,
+                alergias: document.getElementById('alergias').value,
+                antecedentes: document.getElementById('antecedentes').value,
+                lopd: document.getElementById('lopd').checked
+            };
+
+            await fetch(API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(datos)
+            });
+
+            // Limpiar formulario
+            document.getElementById('nombre').value = '';
+            document.getElementById('num_doc').value = '';
+            document.getElementById('telefono').value = '';
+            document.getElementById('email').value = '';
+            document.getElementById('direccion').value = '';
+            document.getElementById('contacto_emergencia').value = '';
+            document.getElementById('tel_emergencia').value = '';
+            document.getElementById('alergias').value = '';
+            document.getElementById('antecedentes').value = '';
+            document.getElementById('lopd').checked = false;
+
+            volverAlPrincipal();
+        }
+
+        async function abrirFicha(id) {
+            pacienteActualId = id;
+            const respuesta = await fetch(`${API_URL}/${id}`);
+            const p = await respuesta.json();
+
+            document.getElementById('vista-principal').classList.add('oculto');
+            document.getElementById('vista-ficha').classList.remove('oculto');
+
+            let historialHtml = '';
+            if (p.visitas.length === 0) {
+                historialHtml = '<p style="color: #666;">No hay visitas registradas en el historial.</p>';
+            } else {
+                p.visitas.forEach(v => {
+                    historialHtml += `<div style="border-bottom: 1px dashed #ccc; padding: 10px 0;">
+                        <strong>📅 ${v.fecha}</strong> — ${v.tratamiento} <br>
+                        <span style="color: #007bff; font-weight: bold;">Coste: ${v.coste}</span>
+                    </div>`;
+                });
+            }
+
+            document.getElementById('contenido-ficha').innerHTML = `
+                <div class="ficha-header">
+                    <h2>Ficha de: ${p.nombre}</h2>
+                    <p><strong>${p.tipo_doc}:</strong> ${p.num_doc || 'No indicado'} | <strong>Tel:</strong> ${p.telefono} | <strong>Email:</strong> ${p.email || 'Sin email'}</p>
+                    <p>🏠 <strong>Dirección:</strong> ${p.direccion || 'No indicada'}</p>
+                    
+                    <div class="emergencia-box">
+                        🚨 <strong>Contacto de Emergencia:</strong> ${p.contacto_emergencia || 'No asignado'} 
+                        ${p.tel_emergencia ? '— 📞 <strong>' + p.tel_emergencia + '</strong>' : ''}
+                    </div>
+
+                    <p>⚠️ <span class="alerta-roja">Alergias:</span> ${p.alergias || 'Ninguna'}</p>
+                    <p>🩺 <span class="alerta-roja">Antecedentes:</span> ${p.antecedentes || 'Ninguno'}</p>
+                    <p>📄 <strong>LOPD:</strong> ${p.lopd ? '<span class="estado-verde">Firmado ✅</span>' : '<span class="alerta-roja">Pendiente ❌</span>'}</p>
+                </div>
+                <h3>Historial Clínico y Visitas Anteriores</h3>
+                ${historialHtml}
+            `;
+
+            const hoy = new Date().toLocaleDateString('es-ES');
+            document.getElementById('visita-fecha').value = hoy;
+        }
+
+        async function guardarVisita() {
+            const tratamiento = document.getElementById('visita-tratamiento').value;
+            const fecha = document.getElementById('visita-fecha').value;
+            const coste = document.getElementById('visita-coste').value;
+
+            if (!tratamiento) {
+                alert('Escribe una descripción del tratamiento.');
+                return;
+            }
+
+            await fetch(`${API_URL}/${pacienteActualId}/visitas`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ fecha, tratamiento, coste })
+            });
+
+            document.getElementById('visita-tratamiento').value = '';
+            document.getElementById('visita-coste').value = '';
+
+            abrirFicha(pacienteActualId);
+        }
+
+        cargarPacientes();
+    </script>
+
+</body>
+</html>
