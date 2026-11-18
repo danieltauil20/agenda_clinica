@@ -1,4 +1,4 @@
-const API_URL = 'http://localhost:5000';
+const API_URL = 'https://agenda-clinica-fg18.onrender.com';
 
 // Obtener todos los pacientes
 export const obtenerPacientes = async () => {
