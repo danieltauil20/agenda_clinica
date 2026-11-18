@@ -19,8 +19,8 @@ export default function App() {
   const [newEmail, setNewEmail] = useState('');
   const [newStreet, setNewStreet] = useState('');
   const [postalCode, setPostalCode] = useState('28222');
-  const [city, setCity] = useState('MAJADAHONDA');
-  const [province, setProvince] = useState('MADRID');
+  const [city] = useState('MAJADAHONDA');
+  const [province] = useState('MADRID');
   const [newLegalTutor, setNewLegalTutor] = useState('');
   const [newRgpdAccepted, setNewRgpdAccepted] = useState(false);
 
@@ -62,12 +62,6 @@ export default function App() {
   const handlePostalCodeChange = (e) => {
     const cp = e.target.value.replace(/\D/g, '').slice(0, 5);
     setPostalCode(cp);
-
-    if (cp.length === 5) {
-      const result = lookupPostalCode(cp);
-      if (result.city) setCity(result.city);
-      if (result.province) setProvince(result.province);
-    }
   };
 
   const filteredPatients = patients.filter(p => 
