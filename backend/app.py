@@ -1,56 +1,35 @@
 import os
 from flask import Flask, jsonify, request, session, redirect, url_for
-from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
 from datetime import datetime
 from google_auth_oauthlib.flow import Flow
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 
+# Importamos la base de datos y los modelos profesionales desde models.py
+from models import db, Paciente, Cita, Visita, Presupuesto, LineaPresupuesto
+
 app = Flask(__name__)
-app.secret_key = 'clave_secreta_super_segura_para_la_clinica'  # Cambiala por una clave aleatoria fuerte
+app.secret_key = 'tu_clave_secreta_super_segura'
 CORS(app)
 
 # Importante para pruebas locales con http://
 os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
 
-# Asegúrate de tener una secret_key configurada en tu app de Flask para las sesiones
-app.secret_key = 'tu_clave_secreta_super_segura'
-
 SCOPES = ['https://www.googleapis.com/auth/calendar.readonly']
 CLIENT_SECRETS_FILE = 'credentials.json'
 
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///clinica_real.db'
+app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', 'sqlite:///clinica_real.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-db = SQLAlchemy(app)
 
-# --- MODELOS DE LA CLÍNICA ---
-class Paciente(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    nombre = db.Column(db.String(100), nullable=False)
-    tipo_doc = db.Column(db.String(20), default='DNI')
-    num_doc = db.Column(db.String(30), nullable=True)
-    telefono = db.Column(db.String(20), nullable=False)
-    email = db.Column(db.String(100), nullable=True)
-    direccion = db.Column(db.String(200), nullable=True)
-    contacto_emergencia = db.Column(db.String(100), nullable=True)
-    tel_emergencia = db.Column(db.String(20), nullable=True)
-    alergias = db.Column(db.Text, nullable=True)
-    antecedentes = db.Column(db.Text, nullable=True)
-    lopd = db.Column(db.Boolean, default=False)
-    visitas = db.relationship('Visita', backref='paciente', cascade='all, delete-orphan', lazy=True)
-
-class Visita(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    paciente_id = db.Column(db.Integer, db.ForeignKey('paciente.id'), nullable=False)
-    fecha = db.Column(db.String(20), nullable=False)
-    tratamiento = db.Column(db.Text, nullable=False)
-    coste = db.Column(db.String(20), nullable=True)
+# Inicializamos db con nuestra app
+db.init_app(app)
 
 with app.app_context():
     db.create_all()
 
-# --- RUTAS DE PACIENTES Y VISITAS ---
+
+# --- RUTAS DE PACIENTES ---
 @app.route('/pacientes', methods=['GET'])
 def listar_pacientes():
     pacientes = Paciente.query.all()
@@ -67,9 +46,11 @@ def listar_pacientes():
         "alergias": p.alergias,
         "antecedentes": p.antecedentes,
         "lopd": p.lopd,
-        "total_visitas": len(p.visitas)
+        "total_visitas": len(p.visitas),
+        "total_presupuestos": len(p.presupuestos)
     } for p in pacientes]
-    return jsonify(resultado)
+    return jsonify(resultado), 200
+
 
 @app.route('/pacientes', methods=['POST'])
 def crear_paciente():
@@ -89,7 +70,8 @@ def crear_paciente():
     )
     db.session.add(nuevo)
     db.session.commit()
-    return jsonify({"mensaje": "¡Paciente registrado con éxito!"}), 201
+    return jsonify({"mensaje": "¡Paciente registrado con éxito!", "id": nuevo.id}), 201
+
 
 @app.route('/pacientes/<int:id>', methods=['GET'])
 def ver_paciente(id):
@@ -98,9 +80,17 @@ def ver_paciente(id):
         "id": v.id,
         "fecha": v.fecha,
         "tratamiento": v.tratamiento,
+        "pieza_dental": v.pieza_dental,
         "coste": v.coste
     } for v in p.visitas]
     
+    presupuestos_list = [{
+        "id": pr.id,
+        "fecha": pr.fecha,
+        "estado": pr.estado,
+        "total": pr.total
+    } for pr in p.presupuestos]
+
     return jsonify({
         "id": p.id,
         "nombre": p.nombre,
@@ -114,9 +104,12 @@ def ver_paciente(id):
         "alergias": p.alergias,
         "antecedentes": p.antecedentes,
         "lopd": p.lopd,
-        "visitas": visitas_list
-    })
+        "visitas": visitas_list,
+        "presupuestos": presupuestos_list
+    }), 200
 
+
+# --- RUTAS DE VISITAS (HISTORIAL CLÍNICO) ---
 @app.route('/pacientes/<int:id>/visitas', methods=['POST'])
 def agregar_visita(id):
     Paciente.query.get_or_404(id)
@@ -126,11 +119,13 @@ def agregar_visita(id):
         paciente_id=id,
         fecha=datos.get('fecha', datetime.now().strftime('%d/%m/%Y')),
         tratamiento=datos.get('tratamiento'),
-        coste=datos.get('coste', '0€')
+        pieza_dental=datos.get('pieza_dental'), # Soporte para el odontograma
+        coste=datos.get('coste', 0.0)
     )
     db.session.add(nueva_visita)
     db.session.commit()
-    return jsonify({"mensaje": "¡Visita añadida al historial con éxito!"}), 201
+    return jsonify({"mensaje": "¡Visita añadida al historial clínico con éxito!"}), 201
+
 
 # --- RUTAS DE GOOGLE CALENDAR & OAUTH ---
 @app.route('/auth/login')
@@ -144,10 +139,10 @@ def auth_login():
         prompt='consent',
         include_granted_scopes='true'
     )
-    # Guardamos el state y el code_verifier directamente del flow
     session['state'] = state
     session['code_verifier'] = flow.code_verifier
     return redirect(authorization_url)
+
 
 @app.route('/auth/callback')
 def auth_callback():
@@ -160,7 +155,6 @@ def auth_callback():
         redirect_uri=url_for('auth_callback', _external=True)
     )
     
-    # Asignamos de nuevo el code_verifier guardado en la sesión antes de canjear el token
     if 'code_verifier' in session:
         flow.code_verifier = session['code_verifier']
     
@@ -204,7 +198,8 @@ def listar_citas_calendario():
         "descripcion": event.get('description', '')
     } for event in events]
     
-    return jsonify(resultado)
+    return jsonify(resultado), 200
+
 
 if __name__ == '__main__':
     app.run(debug=True)

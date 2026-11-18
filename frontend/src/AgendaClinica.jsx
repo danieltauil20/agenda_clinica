@@ -1,27 +1,35 @@
 import { useState, useEffect } from 'react';
+import PatientModal from './components/PatientModal';
 
 export default function AgendaClinica() {
-  const [citas, setCitas] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [citas] = useState([
+    {
+      summary: 'Dra. Edianny - Implantología (Juan Pérez)',
+      descripcion: 'Control de implante pieza 36 y revisión general de encías.',
+      start: new Date(new Date().setHours(10, 0, 0, 0)).toISOString(),
+    },
+    {
+      summary: 'Dra. Edianny - Endodoncia (María Gómez)',
+      descripcion: 'Dolor agudo en pieza 16. Diagnóstico y apertura.',
+      start: new Date(new Date().setHours(11, 30, 0, 0)).toISOString(),
+    },
+    {
+      summary: 'Dra. Edianny - Limpieza y Blanqueamiento (Carlos Ruiz)',
+      descripcion: 'Limpieza ultrasónica semestral y presupuesto de blanqueamiento.',
+      start: new Date(new Date().setHours(13, 0, 0, 0)).toISOString(),
+    }
+  ]);
+  const [error] = useState(null);
   const [estadoSillon, setEstadoSillon] = useState('libre'); // 'libre', 'ocupado', 'esterilizando'
-  const [pacienteActual, setPacienteActual] = useState(null);
+  const [pacienteActual, setPacienteActual] = useState({
+    summary: 'Dra. Edianny - Implantología (Juan Pérez)',
+    descripcion: 'Control de implante pieza 36 y revisión general de encías.',
+    start: new Date(new Date().setHours(10, 0, 0, 0)).toISOString(),
+  });
+  const [selectedPatient, setSelectedPatient] = useState(null);
 
   useEffect(() => {
-    fetch('http://localhost:5000/calendar/citas')
-      .then((res) => {
-        if (!res.ok) throw new Error('No se pudo obtener la información de las citas');
-        return res.json();
-      })
-      .then((data) => {
-        setCitas(data);
-        if (data.length > 0) setPacienteActual(data[0]); // Selecciona el primero por defecto
-        setLoading(false);
-      })
-      .catch((err) => {
-        setError(err.message);
-        setLoading(false);
-      });
+    // Espacio reservado para sincronizar con el backend de Flask en el futuro
   }, []);
 
   return (
@@ -70,9 +78,12 @@ export default function AgendaClinica() {
 
             {pacienteActual ? (
               <div className="space-y-4">
-                <div className="p-4 rounded-xl bg-[#141010] border border-[#513028]">
-                  <span className="text-[10px] uppercase font-bold text-[#EBCAC5]/60 tracking-wider block mb-1">Paciente en Curso / Siguiente</span>
-                  <h3 className="text-lg font-bold text-[#FDFBFB]">{pacienteActual.summary}</h3>
+                <div 
+                  onClick={() => setSelectedPatient({ name: pacienteActual.summary, phone: '600000000', dni: '12345678X' })}
+                  className="p-4 rounded-xl bg-[#141010] border border-[#513028] cursor-pointer hover:border-[#EBCAC5] transition-all group"
+                >
+                  <span className="text-[10px] uppercase font-bold text-[#EBCAC5]/60 tracking-wider block mb-1">Paciente en Curso (Haz clic para ver ficha)</span>
+                  <h3 className="text-lg font-bold text-[#FDFBFB] group-hover:text-blue-300 transition-colors">{pacienteActual.summary}</h3>
                   <p className="text-xs text-[#EBCAC5]/80 mt-1">{pacienteActual.descripcion || 'Sin observaciones clínicas previas.'}</p>
                 </div>
 
@@ -128,13 +139,6 @@ export default function AgendaClinica() {
             </span>
           </div>
 
-          {loading && (
-            <div className="flex flex-col items-center justify-center py-16 text-[#EBCAC5]">
-              <div className="w-8 h-8 border-2 border-[#EBCAC5] border-t-transparent rounded-full animate-spin mb-3"></div>
-              <p className="text-sm font-medium text-[#FDFBFB]">Cargando agenda del sábado...</p>
-            </div>
-          )}
-
           {error && (
             <div className="p-4 bg-[#2C1B17] border border-[#513028] rounded-xl text-[#EBCAC5] text-sm">
               <p className="font-bold mb-1">Se requiere autenticación de Google Calendar:</p>
@@ -142,18 +146,15 @@ export default function AgendaClinica() {
             </div>
           )}
 
-          {!loading && !error && citas.length === 0 && (
-            <div className="text-center py-12 border-2 border-dashed border-[#513028] rounded-xl text-[#EBCAC5]/60 text-sm">
-              No hay citas programadas para este sábado.
-            </div>
-          )}
-
-          {!loading && citas.length > 0 && (
-            <div className="space-y-3 max-h-[480px] overflow-y-auto pr-2">
+          {citas.length > 0 && (
+            <div className="space-y-3 max-h-120 overflow-y-auto pr-2">
               {citas.map((cita, index) => (
                 <div 
                   key={index}
-                  onClick={() => setPacienteActual(cita)}
+                  onClick={() => {
+                    setPacienteActual(cita);
+                    setSelectedPatient({ name: cita.summary, phone: '600000000', dni: '12345678X' });
+                  }}
                   className={`p-4 rounded-xl border transition-all cursor-pointer flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 ${
                     pacienteActual?.summary === cita.summary 
                       ? 'bg-[#2C1B17] border-[#EBCAC5] shadow-md' 
@@ -184,6 +185,14 @@ export default function AgendaClinica() {
         </section>
 
       </main>
+
+      {/* MODAL / DRAWER LATERAL DE PACIENTE */}
+      {selectedPatient && (
+        <PatientModal 
+          patient={selectedPatient} 
+          onClose={() => setSelectedPatient(null)} 
+        />
+      )}
     </div>
   );
 }
